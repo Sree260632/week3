@@ -3,30 +3,36 @@ import tensorflow as tf
 import numpy as np
 import cv2
 import os
+import gdown
 from PIL import Image
-# 🔽 Download model if not present locally
+
+# 📌 Download model from Google Drive if not present locally
 def download_model():
     model_path = "trained_model.keras"
     if not os.path.exists(model_path):
         file_id = "10kq0xS3WKsaz1YHiQ64Rjn2Q-xhHk4kt"
         url = f"https://drive.google.com/uc?id={file_id}"
+        st.write("⏳ Downloading model from Google Drive...")
         gdown.download(url, model_path, quiet=False)
     return model_path
-# Load and preprocess the image
+
+# 🔽 Load model with caching for faster inference
+@st.cache_resource
+def load_model():
+    model_path = download_model()
+    return tf.keras.models.load_model(model_path)
+
+model = load_model()
+
+# 🌿 Function to preprocess image and predict disease
 def model_predict(image_path):
     try:
-        # Load the trained model
-        model = tf.keras.models.load_model("trained_model.keras")
-        
-        # Read and process the image
         img = cv2.imread(image_path)
-        H, W, C = 224, 224, 3
-        img = cv2.resize(img, (H, W))
+        img = cv2.resize(img, (224, 224))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = img.astype("float32") / 255.0
-        img = img.reshape(1, H, W, C)
+        img = img.reshape(1, 224, 224, 3)
         
-        # Predict and return results
         prediction = model.predict(img)
         result_index = np.argmax(prediction)
         confidence = np.max(prediction)
@@ -35,18 +41,19 @@ def model_predict(image_path):
     except Exception as e:
         return None, str(e)
 
-# Sidebar for navigation
+# 📌 Sidebar menu
 st.sidebar.title("🌱 Plant Disease Detection System")
 app_mode = st.sidebar.selectbox("Select Page", ["HOME", "DISEASE RECOGNITION"])
 
-# Displaying home image/logo
+# 📌 Display logo from GitHub instead of local path
+img_url = "https://raw.githubusercontent.com/sree260632/ESR-PLANT-SCAN/main/logo_app.png"
 try:
-    img = Image.open(r"C:\Users\sreeram\Downloads\logo app.png")
+    img = Image.open(img_url)
     st.image(img)
 except Exception as e:
     st.warning(f"⚠️ Logo image not found: {e}")
 
-# Class labels
+# 🌿 Class labels for plant diseases
 class_name = [
     'Apple___Apple_scab', 'Apple___Black_rot', 'Apple___Cedar_apple_rust', 'Apple___healthy',
     'Blueberry___healthy', 'Cherry_(including_sour)___Powdery_mildew', 
@@ -64,14 +71,14 @@ class_name = [
     'Tomato___healthy'
 ]
 
-# Home Page
+# 📌 Home Page
 if app_mode == "HOME":
     st.markdown(
         "<h1 style='text-align: center;'>🌾 Plant Disease Detection System for Sustainable Agriculture</h1>",
         unsafe_allow_html=True
     )
 
-# Disease Recognition Page
+# 📌 Disease Recognition Page
 elif app_mode == "DISEASE RECOGNITION":
     st.header("🌿 Plant Disease Recognition")
     test_image = st.file_uploader("Upload an Image:", type=["jpg", "png", "jpeg"])
@@ -96,4 +103,6 @@ elif app_mode == "DISEASE RECOGNITION":
             else:
                 st.error(f"⚠️ Prediction failed: {confidence}")
 
+            # Clean up temporary files
             os.remove(save_path)
+
